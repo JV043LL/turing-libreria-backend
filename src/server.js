@@ -2,14 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const pool = require('./config/db');
 const booksRoutes = require('./routes/books.routes');
+const genresRoutes = require('./routes/genres.routes');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.use('/api/books', booksRoutes);
+app.use('/api/genres', genresRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9000;
 
 pool.query('SELECT 1')
   .then(() => {
