@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const HttpError = require('../utils/httpError');
 
 // Campos que la API permite guardar (lista blanca)
 // id, created_by, created_at y updated_at los controla el servidor por cuestiones de seguridad
@@ -66,9 +67,7 @@ async function update(id, book) {
   const cambios = filtrarCampos(book);
 
   if (Object.keys(cambios).length === 0) {
-    const error = new Error('No se enviaron campos válidos para actualizar');
-    error.status = 400;
-    throw error;
+    throw new HttpError(400, 'No se enviaron campos válidos para actualizar');
   }
 
   const [result] = await pool.query('UPDATE books SET ? WHERE id = ?', [cambios, id]);
