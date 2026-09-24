@@ -3,11 +3,11 @@
 --  Proyecto: Librería en línea
 --
 --  Diseño en tercera forma normal (3NF):
---    - roles, users, genres, authors, books
+--    - roles, users, genres, authors, books, favorites
 --  Autores y generos viven en tablas propias; books solo guarda sus FK.
 --
 --  Uso:
---    mysql -u root -p < libreria_db.sql
+--    mysql -u root -p < database/script.sql
 -- =====================================================================
 
 DROP DATABASE IF EXISTS turing_libreria;
@@ -108,6 +108,26 @@ CREATE TABLE books (
     FOREIGN KEY (created_by) REFERENCES users (id)
     ON UPDATE CASCADE
     ON DELETE SET NULL            -- si se borra el admin, el libro permanece
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 6. favorites: libros que cada usuario guarda como favoritos
+--    Tabla intermedia (relacion muchos a muchos entre users y books).
+--    La llave primaria compuesta evita guardar el mismo libro dos veces.
+-- ---------------------------------------------------------------------
+CREATE TABLE favorites (
+  user_id     INT UNSIGNED NOT NULL,
+  book_id     INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, book_id),
+  CONSTRAINT fk_favorites_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,            -- si se borra el usuario, se borran sus favoritos
+  CONSTRAINT fk_favorites_book
+    FOREIGN KEY (book_id) REFERENCES books (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE             -- si se borra el libro, desaparece de los favoritos
 ) ENGINE = InnoDB;
 
 
@@ -226,6 +246,11 @@ VALUES
   ('Hábitos atómicos',
    'Un método práctico para crear buenos hábitos, eliminar los malos y mejorar un poco cada día.',
    349.00, 18, '9780735211292', 2018, 8, 15, 1);
+
+-- Favoritos del usuario demo (id 2)
+INSERT INTO favorites (user_id, book_id) VALUES
+  (2, 1),
+  (2, 6);
 
 -- Necesario para la ejecucion de la actualizacion de las url de los libros (books)
 SET SQL_SAFE_UPDATES = 0;
