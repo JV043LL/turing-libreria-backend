@@ -17,6 +17,8 @@ CREATE DATABASE turing_libreria
 
 USE turing_libreria;
 
+SET NAMES utf8mb4;
+
 -- ---------------------------------------------------------------------
 -- 1. roles: catálogo de tipos de usuario (admin, user)
 -- ---------------------------------------------------------------------
@@ -70,7 +72,7 @@ CREATE TABLE authors (
 
 -- ---------------------------------------------------------------------
 -- 5. books: libros del catálogo
---    portada_url: si no se envía, toma una imagen por defecto.
+--    portada_url: si no se envía, el trigger la arma con el ISBN (Open Library).
 -- ---------------------------------------------------------------------
 CREATE TABLE books (
   id                INT UNSIGNED      NOT NULL AUTO_INCREMENT,
@@ -224,3 +226,52 @@ VALUES
   ('Hábitos atómicos',
    'Un método práctico para crear buenos hábitos, eliminar los malos y mejorar un poco cada día.',
    349.00, 18, '9780735211292', 2018, 8, 15, 1);
+
+-- Necesario para la ejecucion de la actualizacion de las url de los libros (books)
+SET SQL_SAFE_UPDATES = 0;
+-- Actualizacion del url de la portada
+UPDATE books SET portada_url = CONCAT('https://covers.openlibrary.org/b/isbn/', isbn, '-M.jpg');
+
+-- ---------------------------------------------------------------------
+-- Trigger: valida la portada, si no trae se crea con la api de openlibrary
+-- ---------------------------------------------------------------------
+DELIMITER //
+
+CREATE TRIGGER trg_books_antes_de_agregar
+BEFORE INSERT ON books
+FOR EACH ROW
+BEGIN
+  -- Si no trae portada, se arma con el ISBN (Open Library)
+  -- El DEFAULT de la columna se aplica antes del trigger, por eso tambien se reemplaza la imagen por defecto
+  IF NEW.portada_url IS NULL
+     OR TRIM(NEW.portada_url) = ''
+     OR NEW.portada_url = 'https://placehold.co/300x450?text=Sin+portada' THEN
+    SET NEW.portada_url = CONCAT('https://covers.openlibrary.org/b/isbn/', NEW.isbn, '-M.jpg');
+  END IF;
+  
+END//
+DELIMITER ;
+
+-- ---------------------------------------------------------------------
+-- Vista: libros con el nombre de su autor y su genero
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE VIEW v_libros AS
+SELECT
+  b.id,
+  b.titulo,
+  b.sinopsis,
+  b.precio,
+  b.stock,
+  (b.stock > 0)        AS disponible,  -- 1 = hay stock, 0 = agotado
+  b.isbn,
+  b.portada_url,
+  b.anio_publicacion,
+  b.genre_id,
+  g.nombre             AS genero,
+  b.author_id,
+  a.nombre             AS autor,
+  a.nacionalidad       AS autor_nacionalidad,
+  b.created_at
+FROM books b
+INNER JOIN genres  g ON g.id = b.genre_id
+INNER JOIN authors a ON a.id = b.author_id;
