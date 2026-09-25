@@ -3,7 +3,7 @@
 --  Proyecto: Librería en línea
 --
 --  Diseño en tercera forma normal (3NF):
---    - roles, users, genres, authors, books, favorites
+--    - roles, users, genres, authors, books, favorites, spaces
 --  Autores y generos viven en tablas propias; books solo guarda sus FK.
 --
 --  Uso:
@@ -130,6 +130,23 @@ CREATE TABLE favorites (
     ON DELETE CASCADE             -- si se borra el libro, desaparece de los favoritos
 ) ENGINE = InnoDB;
 
+-- ---------------------------------------------------------------------
+-- 7. spaces: espacios y actividades de la librería (sección "Nuestro espacio")
+--    Tabla independiente: no depende de otras, así que cumple 3NF por sí misma.
+--    imagen_url acepta una URL absoluta o una ruta del frontend (/espacios/...).
+-- ---------------------------------------------------------------------
+CREATE TABLE spaces (
+  id           TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  nombre       VARCHAR(80)      NOT NULL,
+  resumen      VARCHAR(160)     NOT NULL,
+  descripcion  TEXT             NOT NULL,
+  horario      VARCHAR(120)     NULL,
+  imagen_url   VARCHAR(255)     NULL,
+  orden        TINYINT UNSIGNED NOT NULL DEFAULT 0,  -- posición en la galería
+  PRIMARY KEY (id),
+  CONSTRAINT uq_spaces_nombre UNIQUE (nombre)
+) ENGINE = InnoDB;
+
 
 -- =====================================================================
 --  DATOS DE PRUEBA
@@ -251,6 +268,32 @@ VALUES
 INSERT INTO favorites (user_id, book_id) VALUES
   (2, 1),
   (2, 6);
+
+-- Espacios de la librería
+INSERT INTO spaces (nombre, resumen, descripcion, horario, imagen_url, orden) VALUES
+  ('Sala de lectura',
+   'Mesas amplias, luz natural y silencio para leer sin prisa.',
+   'Nuestra sala de lectura tiene lugar para veinte personas, enchufes en cada mesa y wifi gratuito. Puedes hojear cualquier libro del catálogo antes de comprarlo. Hay café de cortesía por las mañanas.',
+   'Todos los días en horario de tienda',
+   '/espacios/sala-de-lectura.svg', 1),
+
+  ('Club de lectura',
+   'Cada jueves comentamos un libro distinto del catálogo.',
+   'Un grupo abierto de lectores que se reúne a comentar el libro del mes. No necesitas inscribirte: llega con el libro leído (o a medias) y con ganas de platicar. El título de cada mes se anuncia en nuestras redes.',
+   'Jueves de 19:00 a 20:30',
+   '/espacios/club-de-lectura.svg', 2),
+
+  ('Presentaciones de autor',
+   'Autores invitados presentan sus libros y firman ejemplares.',
+   'Una vez al mes recibimos a una autora o autor para conversar sobre su obra. Al final hay sesión de preguntas y firma de libros. La entrada es libre hasta llenar el aforo de cuarenta personas.',
+   'Último sábado de cada mes, 17:00',
+   '/espacios/presentaciones.svg', 3),
+
+  ('Rincón infantil',
+   'Cuentos, cojines y lecturas en voz alta para los más pequeños.',
+   'Un espacio pensado para niñas y niños de 3 a 10 años, con libros ilustrados a su altura. Los domingos por la mañana una de nuestras libreras lee cuentos en voz alta.',
+   'Cuentacuentos los domingos, 11:30',
+   '/espacios/rincon-infantil.svg', 4);
 
 -- Necesario para la ejecucion de la actualizacion de las url de los libros (books)
 SET SQL_SAFE_UPDATES = 0;
