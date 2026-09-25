@@ -53,7 +53,18 @@ erDiagram
         INT book_id PK, FK
         TIMESTAMP created_at
     }
+    spaces {
+        TINYINT id PK
+        VARCHAR nombre UK
+        VARCHAR resumen
+        TEXT descripcion
+        VARCHAR horario
+        VARCHAR imagen_url
+        TINYINT orden
+    }
 ```
+
+`spaces` es independiente: guarda los espacios de la librería que muestra la sección "Nuestro espacio" y no tiene llaves foráneas.
 
 ## Reglas de integridad
 

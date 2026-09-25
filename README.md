@@ -41,7 +41,7 @@ turing-libreria-backend/
 │   ├── app.js                  # configuración de Express
 │   └── server.js               # verifica la BD y levanta el servidor
 ├── tests/
-│   └── api.test.js             # pruebas de integración (20 casos)
+│   └── api.test.js             # pruebas de integración (22 casos)
 ├── .env.example
 └── package.json
 ```
@@ -148,11 +148,11 @@ npm test 2>&1 | Out-File -Encoding utf8 resultado.txt
 | Libros (público) | Paginación, filtro por género, id no numérico (400) |
 | Libros (admin) | Crear sin token (401), crear como `user` (403), crear como `admin` con portada de Open Library, ISBN repetido (409), actualizar y eliminar |
 | Favoritos | Sin sesión (401), agregar, listar y quitar un favorito |
-| Catálogos y errores | Géneros con conteo de libros, autores, ruta inexistente (404) |
+| Catálogos y errores | Géneros con conteo de libros, autores, espacios y espacio inexistente (404), ruta inexistente (404) |
 
 ### Por qué `light-my-request` y no Supertest
 
-Las pruebas se escribieron primero con Supertest, pero en Windows fallaban al azar con `read ECONNRESET`, incluso en rutas que no tocan la base de datos. Para descartar la API, se hicieron 100 peticiones seguidas al servidor desde PowerShell y ninguna falló; en Linux las 20 pruebas pasaban siempre. El problema estaba en las conexiones TCP que Supertest abre dentro de Jest.
+Las pruebas se escribieron primero con Supertest, pero en Windows fallaban al azar con `read ECONNRESET`, incluso en rutas que no tocan la base de datos. Para descartar la API, se hicieron 100 peticiones seguidas al servidor desde PowerShell y ninguna falló; en Linux las pruebas pasaban siempre. El problema estaba en las conexiones TCP que Supertest abre dentro de Jest.
 
 `light-my-request` inyecta cada petición directamente en la app de Express, en memoria, sin abrir un puerto. Las peticiones siguen pasando por todos los middlewares, validaciones, controladores y la base de datos, así que siguen siendo pruebas de integración, y ya no dependen de la red del sistema operativo.
 
@@ -196,6 +196,8 @@ El token dura lo indicado en `JWT_EXPIRES_IN`. Al expirar, la API responde `401`
 | `GET` | `/api/favorites` | Con sesión | Favoritos del usuario. |
 | `POST` | `/api/favorites/:bookId` | Con sesión | Agregar un libro a favoritos. |
 | `DELETE` | `/api/favorites/:bookId` | Con sesión | Quitar un libro de favoritos. |
+| `GET` | `/api/spaces` | Público | Espacios de la librería (sección "Nuestro espacio"). |
+| `GET` | `/api/spaces/:id` | Público | Detalle de un espacio. |
 
 La colección de Postman con todas las peticiones está en [`docs/turing-libreria.postman_collection.json`](docs/turing-libreria.postman_collection.json). Al ejecutar **Login admin** o **Login user**, el token se guarda solo y las demás peticiones lo usan.
 
@@ -382,6 +384,30 @@ Todas las rutas requieren sesión, con cualquier rol. Cada usuario solo ve y mod
 
 ---
 
+### Espacios
+
+Alimentan la sección "Nuestro espacio" del frontend y su página de detalle. Se devuelven en el orden de la galería.
+
+```bash
+curl "http://localhost:9000/api/spaces"
+curl "http://localhost:9000/api/spaces/2"
+```
+
+```json
+{
+  "id": 2,
+  "nombre": "Club de lectura",
+  "resumen": "Cada jueves comentamos un libro distinto del catálogo.",
+  "descripcion": "Un grupo abierto de lectores que se reúne a comentar el libro del mes...",
+  "horario": "Jueves de 19:00 a 20:30",
+  "imagen_url": "/espacios/club-de-lectura.svg"
+}
+```
+
+`imagen_url` acepta una URL absoluta o una ruta que sirve el frontend (carpeta `public/`). `GET /api/spaces/:id` responde `404` si el espacio no existe.
+
+---
+
 ## Errores
 
 Todos los errores tienen la misma forma:
@@ -428,4 +454,4 @@ Los errores de validación incluyen el detalle por campo:
 
 ## Base de datos
 
-Seis tablas en 3NF (`roles`, `users`, `genres`, `authors`, `books`, `favorites`), la vista `v_libros` y un trigger para las portadas. El diagrama entidad-relación y las reglas de integridad están en [`docs/diagrama-er.md`](docs/diagrama-er.md).
+Siete tablas en 3NF (`roles`, `users`, `genres`, `authors`, `books`, `favorites`, `spaces`), la vista `v_libros` y un trigger para las portadas. El diagrama entidad-relación y las reglas de integridad están en [`docs/diagrama-er.md`](docs/diagrama-er.md).
