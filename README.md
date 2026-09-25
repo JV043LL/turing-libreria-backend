@@ -121,7 +121,7 @@ Resultado esperado:
 
 ```text
 Test Suites: 1 passed, 1 total
-Tests:       20 passed, 20 total
+Tests:       22 passed, 22 total
 ```
 
 Antes de correrlas:
