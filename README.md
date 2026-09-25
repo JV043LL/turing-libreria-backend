@@ -13,7 +13,7 @@ Permite consultar un catálogo de libros filtrable por género, iniciar sesión 
 | Autenticación | JWT (`jsonwebtoken`) y contraseñas cifradas con bcrypt (`bcryptjs`) |
 | Validación | `express-validator` |
 | Seguridad | `helmet`, `cors`, `express-rate-limit` |
-| Pruebas | Jest y Supertest |
+| Pruebas | Jest y `light-my-request` (pruebas de integración) |
 
 ## Estructura del proyecto
 
@@ -41,7 +41,7 @@ turing-libreria-backend/
 │   ├── app.js                  # configuración de Express
 │   └── server.js               # verifica la BD y levanta el servidor
 ├── tests/
-│   └── api.test.js             # pruebas de integración
+│   └── api.test.js             # pruebas de integración (20 casos)
 ├── .env.example
 └── package.json
 ```
@@ -117,7 +117,44 @@ La API queda disponible en `http://localhost:9000/api`. Para comprobarlo: `GET h
 npm test
 ```
 
-Las pruebas usan la base de datos del `.env`, así que requieren haber ejecutado `script.sql`. Crean y borran sus propios registros.
+Resultado esperado:
+
+```text
+Test Suites: 1 passed, 1 total
+Tests:       20 passed, 20 total
+```
+
+Antes de correrlas:
+
+- MySQL debe estar encendido y la base de datos creada con `database/script.sql` (paso 3).
+- El `.env` debe estar configurado (paso 2). Las pruebas usan esa misma base de datos.
+- No hace falta levantar el servidor: las pruebas no abren ningún puerto, así que pueden correr aunque `npm start` esté activo.
+
+Las pruebas crean y borran sus propios registros (un libro con ISBN `9999999999999` y un usuario `prueba_<timestamp>@test.com`), por lo que se pueden ejecutar varias veces seguidas sin volver a cargar el script.
+
+Para guardar el resultado en un archivo (PowerShell, con acentos en UTF-8):
+
+```powershell
+npm test 2>&1 | Out-File -Encoding utf8 resultado.txt
+```
+
+`resultado.txt` está en `.gitignore`.
+
+### Qué cubren las pruebas
+
+| Grupo | Casos |
+|---|---|
+| Auth | Login correcto sin exponer la contraseña, login incorrecto (401), registro con rol `user`, email repetido (409), contraseña débil (400 con detalles), `/me` sin token (401) |
+| Libros (público) | Paginación, filtro por género, id no numérico (400) |
+| Libros (admin) | Crear sin token (401), crear como `user` (403), crear como `admin` con portada de Open Library, ISBN repetido (409), actualizar y eliminar |
+| Favoritos | Sin sesión (401), agregar, listar y quitar un favorito |
+| Catálogos y errores | Géneros con conteo de libros, autores, ruta inexistente (404) |
+
+### Por qué `light-my-request` y no Supertest
+
+Las pruebas se escribieron primero con Supertest, pero en Windows fallaban al azar con `read ECONNRESET`, incluso en rutas que no tocan la base de datos. Para descartar la API, se hicieron 100 peticiones seguidas al servidor desde PowerShell y ninguna falló; en Linux las 20 pruebas pasaban siempre. El problema estaba en las conexiones TCP que Supertest abre dentro de Jest.
+
+`light-my-request` inyecta cada petición directamente en la app de Express, en memoria, sin abrir un puerto. Las peticiones siguen pasando por todos los middlewares, validaciones, controladores y la base de datos, así que siguen siendo pruebas de integración, y ya no dependen de la red del sistema operativo.
 
 ## Usuarios de prueba
 
