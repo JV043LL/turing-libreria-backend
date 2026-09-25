@@ -1,7 +1,11 @@
 // Pruebas de integracion: usan la base de datos configurada en .env.
 // Antes de correrlas, ejecuta database/script.sql para tener los datos de prueba.
 // Comando: npm test
-const request = require('supertest');
+//
+// Las peticiones se inyectan directamente en la app con light-my-request,
+// sin abrir un puerto ni usar la red. Asi se evitan los errores
+// "read ECONNRESET" intermitentes que aparecian en Windows con supertest.
+const inject = require('light-my-request');
 const app = require('../src/app');
 const pool = require('../src/config/db');
 
@@ -12,8 +16,22 @@ let tokenAdmin;
 let tokenUser;
 let libroCreadoId;
 
+// Hace una peticion a la API y devuelve { status, body }
+async function api(method, url, { body, token } = {}) {
+  const headers = token ? { authorization: `Bearer ${token}` } : {};
+  const res = await inject(app, { method, url, payload: body, headers });
+
+  let data;
+  try {
+    data = res.json();
+  } catch {
+    data = res.body;
+  }
+  return { status: res.statusCode, body: data };
+}
+
 async function login(email, password) {
-  const res = await request(app).post('/api/auth/login').send({ email, password });
+  const res = await api('POST', '/api/auth/login', { body: { email, password } });
   return res.body.token;
 }
 
@@ -32,9 +50,9 @@ afterAll(async () => {
 
 describe('Auth', () => {
   test('login correcto devuelve token y usuario sin contraseña', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'admin@libreria.com', password: 'Admin123!' });
+    const res = await api('POST', '/api/auth/login', {
+      body: { email: 'admin@libreria.com', password: 'Admin123!' },
+    });
 
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
@@ -43,46 +61,46 @@ describe('Auth', () => {
   });
 
   test('login con contraseña incorrecta responde 401', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'admin@libreria.com', password: 'incorrecta1' });
+    const res = await api('POST', '/api/auth/login', {
+      body: { email: 'admin@libreria.com', password: 'incorrecta1' },
+    });
     expect(res.status).toBe(401);
   });
 
   test('registro crea un usuario con rol user', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ nombre: 'Prueba', email: EMAIL_PRUEBA, password: 'Segura123' });
+    const res = await api('POST', '/api/auth/register', {
+      body: { nombre: 'Prueba', email: EMAIL_PRUEBA, password: 'Segura123' },
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.user.rol).toBe('user');
   });
 
   test('registro con email repetido responde 409', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ nombre: 'Prueba', email: EMAIL_PRUEBA, password: 'Segura123' });
+    const res = await api('POST', '/api/auth/register', {
+      body: { nombre: 'Prueba', email: EMAIL_PRUEBA, password: 'Segura123' },
+    });
     expect(res.status).toBe(409);
   });
 
   test('registro con contraseña débil responde 400 con detalles', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ nombre: 'Prueba', email: 'otro@test.com', password: '123' });
+    const res = await api('POST', '/api/auth/register', {
+      body: { nombre: 'Prueba', email: 'otro@test.com', password: '123' },
+    });
 
     expect(res.status).toBe(400);
     expect(res.body.detalles.length).toBeGreaterThan(0);
   });
 
   test('GET /me sin token responde 401', async () => {
-    const res = await request(app).get('/api/auth/me');
+    const res = await api('GET', '/api/auth/me');
     expect(res.status).toBe(401);
   });
 });
 
 describe('Libros (público)', () => {
   test('lista paginada con datos de paginación', async () => {
-    const res = await request(app).get('/api/books?limit=5');
+    const res = await api('GET', '/api/books?limit=5');
 
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBeLessThanOrEqual(5);
@@ -90,14 +108,14 @@ describe('Libros (público)', () => {
   });
 
   test('filtra por género', async () => {
-    const res = await request(app).get('/api/books?genre=3');
+    const res = await api('GET', '/api/books?genre=3');
 
     expect(res.status).toBe(200);
     expect(res.body.data.every((libro) => libro.genre_id === 3)).toBe(true);
   });
 
   test('id no numérico responde 400', async () => {
-    const res = await request(app).get('/api/books/abc');
+    const res = await api('GET', '/api/books/abc');
     expect(res.status).toBe(400);
   });
 });
@@ -113,17 +131,17 @@ describe('Libros (admin)', () => {
   };
 
   test('sin token no se puede crear (401)', async () => {
-    const res = await request(app).post('/api/books').send(nuevoLibro);
+    const res = await api('POST', '/api/books', { body: nuevoLibro });
     expect(res.status).toBe(401);
   });
 
   test('un user no puede crear (403)', async () => {
-    const res = await request(app).post('/api/books').set('Authorization', `Bearer ${tokenUser}`).send(nuevoLibro);
+    const res = await api('POST', '/api/books', { body: nuevoLibro, token: tokenUser });
     expect(res.status).toBe(403);
   });
 
   test('un admin crea el libro y se genera la portada', async () => {
-    const res = await request(app).post('/api/books').set('Authorization', `Bearer ${tokenAdmin}`).send(nuevoLibro);
+    const res = await api('POST', '/api/books', { body: nuevoLibro, token: tokenAdmin });
 
     expect(res.status).toBe(201);
     expect(res.body.portada_url).toContain('openlibrary.org');
@@ -131,64 +149,60 @@ describe('Libros (admin)', () => {
   });
 
   test('ISBN repetido responde 409', async () => {
-    const res = await request(app).post('/api/books').set('Authorization', `Bearer ${tokenAdmin}`).send(nuevoLibro);
+    const res = await api('POST', '/api/books', { body: nuevoLibro, token: tokenAdmin });
     expect(res.status).toBe(409);
   });
 
   test('un admin actualiza el libro', async () => {
-    const res = await request(app)
-      .put(`/api/books/${libroCreadoId}`)
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({ precio: 150 });
+    const res = await api('PUT', `/api/books/${libroCreadoId}`, {
+      body: { precio: 150 },
+      token: tokenAdmin,
+    });
 
     expect(res.status).toBe(200);
     expect(res.body.precio).toBe(150);
   });
 
   test('un admin elimina el libro', async () => {
-    const res = await request(app)
-      .delete(`/api/books/${libroCreadoId}`)
-      .set('Authorization', `Bearer ${tokenAdmin}`);
+    const res = await api('DELETE', `/api/books/${libroCreadoId}`, { token: tokenAdmin });
     expect(res.status).toBe(200);
   });
 });
 
 describe('Favoritos', () => {
   test('sin sesión responde 401', async () => {
-    const res = await request(app).get('/api/favorites');
+    const res = await api('GET', '/api/favorites');
     expect(res.status).toBe(401);
   });
 
   test('agregar y quitar un favorito', async () => {
-    const auth = { Authorization: `Bearer ${tokenUser}` };
-
-    const agregar = await request(app).post('/api/favorites/3').set(auth);
+    const agregar = await api('POST', '/api/favorites/3', { token: tokenUser });
     expect([200, 201]).toContain(agregar.status);
 
-    const lista = await request(app).get('/api/favorites').set(auth);
+    const lista = await api('GET', '/api/favorites', { token: tokenUser });
     expect(lista.body.some((libro) => libro.id === 3)).toBe(true);
 
-    const quitar = await request(app).delete('/api/favorites/3').set(auth);
+    const quitar = await api('DELETE', '/api/favorites/3', { token: tokenUser });
     expect(quitar.status).toBe(200);
   });
 });
 
 describe('Catálogos y errores', () => {
   test('GET /api/genres devuelve géneros con conteo', async () => {
-    const res = await request(app).get('/api/genres');
+    const res = await api('GET', '/api/genres');
 
     expect(res.status).toBe(200);
     expect(res.body[0]).toHaveProperty('total_libros');
   });
 
   test('GET /api/authors devuelve autores', async () => {
-    const res = await request(app).get('/api/authors');
+    const res = await api('GET', '/api/authors');
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
   });
 
   test('ruta inexistente responde 404', async () => {
-    const res = await request(app).get('/api/no-existe');
+    const res = await api('GET', '/api/no-existe');
     expect(res.status).toBe(404);
   });
 });
