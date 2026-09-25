@@ -10,5 +10,6 @@ router.use('/books', require('./books.routes'));
 router.use('/genres', require('./genres.routes'));
 router.use('/authors', require('./authors.routes'));
 router.use('/favorites', require('./favorites.routes'));
+router.use('/spaces', require('./spaces.routes'));
 
 module.exports = router;
