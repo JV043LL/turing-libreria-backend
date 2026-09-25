@@ -201,6 +201,19 @@ describe('Catálogos y errores', () => {
     expect(res.body.length).toBeGreaterThan(0);
   });
 
+  test('GET /api/spaces devuelve los espacios en orden', async () => {
+    const res = await api('GET', '/api/spaces');
+
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0]).toHaveProperty('resumen');
+  });
+
+  test('GET /api/spaces/:id inexistente responde 404', async () => {
+    const res = await api('GET', '/api/spaces/250');
+    expect(res.status).toBe(404);
+  });
+
   test('ruta inexistente responde 404', async () => {
     const res = await api('GET', '/api/no-existe');
     expect(res.status).toBe(404);
